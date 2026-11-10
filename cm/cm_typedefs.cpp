@@ -20,6 +20,15 @@ std::unique_ptr<cm_geometry> CClipMap::m_pWipGeometry;
 fvec3 CClipMap::m_vecWipGeometryColor;
 std::mutex CClipMap::mtx;
 
+namespace
+{
+	constexpr float WALKABLE_NORMAL_Z = 0.699999988079071f;
+
+	bool CM_IsWalkableNormal(const float z)
+	{
+		return z >= WALKABLE_NORMAL_Z;
+	}
+}
 
 cm_winding::cm_winding(const std::vector<fvec3>& p, const fvec3& normal, [[maybe_unused]]const fvec3& col) : points(p), normals(normal)
 {
@@ -60,6 +69,9 @@ bool cm_brush::RB_MakeInteriorsRenderable(const cm_renderinfo& info) const
 			RB_TessOverflow(true, info.depth_test);
 
 		if (info.only_bounces && w.is_bounce == false)
+			continue;
+
+		if (info.only_bounces && CM_IsWalkableNormal(w.normals[2]))
 			continue;
 
 		if (info.only_elevators && w.is_elevator == false)
@@ -111,6 +123,9 @@ bool cm_brush::RB_MakeOutlinesRenderable(const cm_renderinfo& info, int& nverts)
 	for (const auto& w : windings) {
 
 		if (info.only_bounces && w.is_bounce == false)
+			continue;
+
+		if (info.only_bounces && CM_IsWalkableNormal(w.normals[2]))
 			continue;
 
 		if (info.only_elevators && w.is_elevator == false)
@@ -201,6 +216,9 @@ bool cm_terrain::RB_MakeInteriorsRenderable(const cm_renderinfo& info) const
 		if ((tri.plane[2] < 0.3f || tri.plane[2] > 0.7f) && info.only_bounces)
 			continue;
 
+		if (info.only_bounces && CM_IsWalkableNormal(tri.plane[2]))
+			continue;
+
 		if (tri.a.dist(cgs->predictedPlayerState.origin) > info.draw_dist)
 			continue;
 
@@ -260,6 +278,9 @@ bool cm_terrain::RB_MakeOutlinesRenderable(const cm_renderinfo& info, int& nvert
 			continue;
 
 		if ((tri.plane[2] < 0.3f || tri.plane[2] > 0.7f) && info.only_bounces)
+			continue;
+
+		if (info.only_bounces && CM_IsWalkableNormal(tri.plane[2]))
 			continue;
 
 		if (tri.a.dist(cgs->predictedPlayerState.origin) > info.draw_dist)
@@ -372,6 +393,9 @@ bool cm_model::RB_MakeInteriorsRenderable(const cm_renderinfo& info) const
 		if ((tri.plane[2] < 0.3f || tri.plane[2] > 0.7f) && info.only_bounces)
 			continue;
 
+		if (info.only_bounces && CM_IsWalkableNormal(tri.plane[2]))
+			continue;
+
 		if (tri.a.dist(cgs->predictedPlayerState.origin) > info.draw_dist)
 			continue;
 
@@ -427,6 +451,9 @@ bool cm_model::RB_MakeOutlinesRenderable(const cm_renderinfo& info, int& nverts)
 	for (const auto& tri : tris) {
 
 		if ((tri.plane[2] < 0.3f || tri.plane[2] > 0.7f) && info.only_bounces)
+			continue;
+
+		if (info.only_bounces && CM_IsWalkableNormal(tri.plane[2]))
 			continue;
 
 		if (tri.a.dist(cgs->predictedPlayerState.origin) > info.draw_dist)
