@@ -95,7 +95,6 @@ void CM_ShowCollision([[maybe_unused]] GfxViewParms* viewParms)
 		.poly_type = static_cast<EPolyType>(Dvar_FindMalleableVar("cm_showCollisionPolyType")->current.integer),
 		.only_colliding = Dvar_FindMalleableVar("cm_ignoreNonColliding")->current.enabled,
 		.only_bounces = Dvar_FindMalleableVar("cm_onlyBounces")->current.enabled,
-		.hide_walkable_bounces = Dvar_FindMalleableVar("cm_hideWalkableBounces")->current.enabled,
 		.only_elevators = Dvar_FindMalleableVar("cm_onlyElevators")->current.enabled,
 		.alpha = Dvar_FindMalleableVar("cm_showCollisionPolyAlpha")->current.value
 	};
