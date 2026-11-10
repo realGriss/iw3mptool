@@ -110,8 +110,23 @@ std::array<fvec3, 3> reconstruct_triangle_vertices(const XModelCollTri_s& tri) {
 
 		for (const auto j : std::views::iota(0, collSurf->numCollTris)) {	
 
-			const auto pts = reconstruct_triangle_vertices(collSurf->collTris[j]);
+			const auto& collTri = collSurf->collTris[j];
+			const auto pts = reconstruct_triangle_vertices(collTri);
 			cm_triangle tri{ pts[0] * scale, pts[1] * scale, pts[2] * scale };
+
+			// The reconstructed vertices do not guarantee the same winding as
+			// the collision triangle stored by the engine. Preserve the engine's
+			// plane orientation so the rendered collision face points outward.
+			vec4_t localPlane{};
+			PlaneFromPointsASM(localPlane, tri.a, tri.b, tri.c);
+
+			const float normalDot =
+				localPlane[0] * collTri.plane[0] +
+				localPlane[1] * collTri.plane[1] +
+				localPlane[2] * collTri.plane[2];
+
+			if (normalDot < 0.0f)
+				std::swap(tri.b, tri.c);
 
 			tri.a = VectorRotate(origin + tri.a, angles, origin);
 			tri.b = VectorRotate(origin + tri.b, angles, origin);
