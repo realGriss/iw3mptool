@@ -3,6 +3,7 @@
 #include "utils/typedefs.hpp"
 
 struct cm_geometry;
+struct cm_winding;
 struct cbrush_t;
 struct SimplePlaneIntersection;
 struct adjacencyWinding_t;
@@ -17,6 +18,7 @@ void CM_ShowCollisionFilter();
 [[nodiscard]] int BrushToPlanes(const cbrush_t* brush, float(*outPlanes)[4]);
 [[nodiscard]] char* CM_MaterialForNormal(const cbrush_t* target, const fvec3& normals);
 [[nodiscard]] bool CM_BrushHasCollision(const cbrush_t* brush);
+[[nodiscard]] bool CM_WindingCoveredBySolidBrush(const cm_winding& winding, const cbrush_t* sourceBrush);
 [[nodiscard]] std::vector<std::string> CM_GetBrushMaterials(const cbrush_t* brush);
 [[nodiscard]] bool CM_BrushInView(const cbrush_t* brush, struct cplane_s* frustumPlanes, int numPlanes = 5);
 [[nodiscard]] bool CM_BoundsInView(const fvec3& mins, const fvec3& maxs, struct cplane_s* frustumPlanes, int numPlanes);
