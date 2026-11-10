@@ -29,20 +29,6 @@ bool CM_AabbTreeHasCollision(const CollisionAabbTree* tree)
 	return (materialInfo->contentFlags & MASK_PLAYERSOLID) != 0;
 }
 
-static bool CM_TerrainTriangleHasWalkableEdge(const int triIndex)
-{
-	if (!cm->triEdgeIsWalkable)
-		return false;
-
-	for (int edge = 0; edge < 3; ++edge) {
-		const int bitIndex = 3 * triIndex + edge;
-		if ((cm->triEdgeIsWalkable[bitIndex >> 3] & (1 << (bitIndex & 7))) != 0)
-			return true;
-	}
-
-	return false;
-}
-
 struct TerrainEdgeInfo
 {
 	int triangleCount = 0;
