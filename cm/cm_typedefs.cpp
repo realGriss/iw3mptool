@@ -71,7 +71,7 @@ bool cm_brush::RB_MakeInteriorsRenderable(const cm_renderinfo& info) const
 		if (info.only_bounces && w.is_bounce == false)
 			continue;
 
-		if (info.only_bounces && info.hide_walkable_bounces && CM_IsWalkableNormal(w.normals[2]))
+		if (info.only_bounces && CM_IsWalkableNormal(w.normals[2]))
 			continue;
 
 		if (info.only_elevators && w.is_elevator == false)
@@ -125,7 +125,7 @@ bool cm_brush::RB_MakeOutlinesRenderable(const cm_renderinfo& info, int& nverts)
 		if (info.only_bounces && w.is_bounce == false)
 			continue;
 
-		if (info.only_bounces && info.hide_walkable_bounces && CM_IsWalkableNormal(w.normals[2]))
+		if (info.only_bounces && CM_IsWalkableNormal(w.normals[2]))
 			continue;
 
 		if (info.only_elevators && w.is_elevator == false)
@@ -216,7 +216,7 @@ bool cm_terrain::RB_MakeInteriorsRenderable(const cm_renderinfo& info) const
 		if ((tri.plane[2] < 0.3f || tri.plane[2] > 0.7f) && info.only_bounces)
 			continue;
 
-		if (info.only_bounces && info.hide_walkable_bounces && CM_IsWalkableNormal(tri.plane[2]))
+		if (info.only_bounces && CM_IsWalkableNormal(tri.plane[2]))
 			continue;
 
 		if (tri.a.dist(cgs->predictedPlayerState.origin) > info.draw_dist)
@@ -280,7 +280,7 @@ bool cm_terrain::RB_MakeOutlinesRenderable(const cm_renderinfo& info, int& nvert
 		if ((tri.plane[2] < 0.3f || tri.plane[2] > 0.7f) && info.only_bounces)
 			continue;
 
-		if (info.only_bounces && info.hide_walkable_bounces && CM_IsWalkableNormal(tri.plane[2]))
+		if (info.only_bounces && CM_IsWalkableNormal(tri.plane[2]))
 			continue;
 
 		if (tri.a.dist(cgs->predictedPlayerState.origin) > info.draw_dist)
@@ -393,7 +393,7 @@ bool cm_model::RB_MakeInteriorsRenderable(const cm_renderinfo& info) const
 		if ((tri.plane[2] < 0.3f || tri.plane[2] > 0.7f) && info.only_bounces)
 			continue;
 
-		if (info.only_bounces && info.hide_walkable_bounces && CM_IsWalkableNormal(tri.plane[2]))
+		if (info.only_bounces && CM_IsWalkableNormal(tri.plane[2]))
 			continue;
 
 		if (tri.a.dist(cgs->predictedPlayerState.origin) > info.draw_dist)
@@ -453,7 +453,7 @@ bool cm_model::RB_MakeOutlinesRenderable(const cm_renderinfo& info, int& nverts)
 		if ((tri.plane[2] < 0.3f || tri.plane[2] > 0.7f) && info.only_bounces)
 			continue;
 
-		if (info.only_bounces && info.hide_walkable_bounces && CM_IsWalkableNormal(tri.plane[2]))
+		if (info.only_bounces && CM_IsWalkableNormal(tri.plane[2]))
 			continue;
 
 		if (tri.a.dist(cgs->predictedPlayerState.origin) > info.draw_dist)
