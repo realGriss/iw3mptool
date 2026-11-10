@@ -7,6 +7,7 @@
 #include "global/defs.hpp"
 #include "r/r_drawtools.hpp"
 #include "cm_export.hpp"
+#include "cg/cg_hooks.hpp"
 
 #include <format>
 #include <algorithm>
@@ -101,6 +102,7 @@ void CM_LoadDvars()
 	Cmd_AddCommand("cm_showCollisionFilter", CM_ShowCollisionFilter);
 	Cmd_AddCommand("cm_showEntities", Cmd_ShowEntities_f);
 	Cmd_AddCommand("cm_mapexport", CM_MapExport);
+	Cmd_AddCommand("pm_bounceTraceDump", CG_DumpBounceTraceDebug);
 
 	static const char* showCollisionNames[] = { "Disabled", "Brushes", "Terrain", "Both" };
 	static const char* poly_types[] = { "Edges", "Polygons", "Both" };
