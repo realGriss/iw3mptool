@@ -4,6 +4,8 @@
 #include "cg/cg_local.hpp"
 #include "cg/cg_offsets.hpp"
 #include <unordered_map>
+#include <cstdint>
+#include <algorithm>
 #include <ranges>
 #include <com/com_vector.hpp>
 
@@ -28,6 +30,74 @@ bool CM_AabbTreeHasCollision(const CollisionAabbTree* tree)
 }
 
 std::unordered_map<CollisionPartition*, CollisionPartition*> discovered_partitions;
+static std::unordered_map<std::uint32_t, unsigned int> terrain_edge_counts;
+
+static std::uint32_t CM_TerrainEdgeKey(const unsigned short a, const unsigned short b)
+{
+	const auto lo = std::min(a, b);
+	const auto hi = std::max(a, b);
+	return (static_cast<std::uint32_t>(lo) << 16) | hi;
+}
+
+static void CM_BuildTerrainEdgeCounts()
+{
+	terrain_edge_counts.clear();
+
+	for (int triIndex = 0; triIndex < cm->triCount; ++triIndex) {
+		const int index = 3 * triIndex;
+		const unsigned short indices[3] = {
+			cm->triIndices[index],
+			cm->triIndices[index + 1],
+			cm->triIndices[index + 2]
+		};
+
+		for (int edge = 0; edge < 3; ++edge)
+			++terrain_edge_counts[CM_TerrainEdgeKey(indices[edge], indices[(edge + 1) % 3])];
+	}
+}
+
+static bool CM_IsLowerBoundaryBounceEdge(
+	const cm_triangle& tri,
+	const unsigned short aIndex,
+	const unsigned short bIndex,
+	const fvec3& a,
+	const fvec3& b)
+{
+	if (tri.plane[2] >= 0.3f)
+		return false;
+
+	const auto it = terrain_edge_counts.find(CM_TerrainEdgeKey(aIndex, bIndex));
+	if (it == terrain_edge_counts.end() || it->second != 1)
+		return false;
+
+	const float minZ = std::min({ tri.a.z, tri.b.z, tri.c.z });
+	constexpr float zEpsilon = 0.01f;
+
+	if (std::fabs(a.z - minZ) > zEpsilon || std::fabs(b.z - minZ) > zEpsilon)
+		return false;
+
+	// Lower rims are expected to be approximately horizontal. This excludes
+	// vertical borders and the internal diagonal of a triangulated quad.
+	return std::fabs(a.z - b.z) <= zEpsilon;
+}
+
+static unsigned char CM_GetTerrainBounceEdgeMask(
+	const cm_triangle& tri,
+	const unsigned short i0,
+	const unsigned short i1,
+	const unsigned short i2)
+{
+	unsigned char mask = 0;
+
+	if (CM_IsLowerBoundaryBounceEdge(tri, i0, i1, tri.a, tri.b))
+		mask |= 1 << 0;
+	if (CM_IsLowerBoundaryBounceEdge(tri, i1, i2, tri.b, tri.c))
+		mask |= 1 << 1;
+	if (CM_IsLowerBoundaryBounceEdge(tri, i2, i0, tri.c, tri.a))
+		mask |= 1 << 2;
+
+	return mask;
+}
 
 
 bool CM_DiscoverTerrain([[maybe_unused]]const std::unordered_set<std::string>& filters)
@@ -35,6 +105,7 @@ bool CM_DiscoverTerrain([[maybe_unused]]const std::unordered_set<std::string>& f
 
 	try {
 		discovered_partitions.clear();
+		CM_BuildTerrainEdgeCounts();
 		for (const auto i : std::views::iota(0u, cm->numLeafs)) {
 			cm_terrain terrain;
 
@@ -91,6 +162,11 @@ void cm_terrain::CM_AdvanceAabbTree(const CollisionAabbTree* aabbTree, const std
 			tri.c = cm->verts[cm->triIndices[triIndice + 2]];
 
 			PlaneFromPointsASM(tri.plane, tri.a, tri.b, tri.c);
+
+			const unsigned short i0 = cm->triIndices[triIndice];
+			const unsigned short i1 = cm->triIndices[triIndice + 1];
+			const unsigned short i2 = cm->triIndices[triIndice + 2];
+			tri.bounce_edge_mask = CM_GetTerrainBounceEdgeMask(tri, i0, i1, i2);
 
 			tri.color[0] = color[0];
 			tri.color[1] = color[1];
