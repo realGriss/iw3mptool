@@ -92,9 +92,16 @@ void cm_terrain::CM_AdvanceAabbTree(const CollisionAabbTree* aabbTree, const std
 
 			PlaneFromPointsASM(tri.plane, tri.a, tri.b, tri.c);
 
-			tri.color[0] = color[0];
-			tri.color[1] = color[1];
-			tri.color[2] = color[2];
+			if (tri.plane[2] < 0.0f) {
+				tri.color[0] = 1.0f;
+				tri.color[1] = 0.0f;
+				tri.color[2] = 1.0f;
+			}
+			else {
+				tri.color[0] = color[0];
+				tri.color[1] = color[1];
+				tri.color[2] = color[2];
+			}
 			tri.color[3] = 0.3f;
 
 			tris.emplace_back(tri);
