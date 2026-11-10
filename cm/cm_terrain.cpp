@@ -32,8 +32,7 @@ bool CM_AabbTreeHasCollision(const CollisionAabbTree* tree)
 struct TerrainEdgeInfo
 {
 	int triangleCount = 0;
-	fvec3 firstNormal = {};
-	bool crease = false;
+	fvec3 normals[2] = {};
 };
 
 static std::unordered_map<std::uint32_t, TerrainEdgeInfo> terrainEdges;
@@ -75,58 +74,44 @@ static void CM_BuildTerrainEdgeInfo()
 			const auto key = CM_TerrainEdgeKey(indices[edge], indices[(edge + 1) % 3]);
 			auto& info = terrainEdges[key];
 
-			if (info.triangleCount == 0) {
-				info.firstNormal = normal;
-			}
-			else {
-				const float dot = info.firstNormal.x * normal.x
-					+ info.firstNormal.y * normal.y
-					+ info.firstNormal.z * normal.z;
-
-				if (dot < 0.999f)
-					info.crease = true;
-			}
+			if (info.triangleCount < 2)
+				info.normals[info.triangleCount] = normal;
 
 			++info.triangleCount;
 		}
 	}
 }
 
-static bool CM_TerrainEdgeIsPhysical(const unsigned short a, const unsigned short b)
+static bool CM_TerrainEdgeIsStepTransition(
+	const unsigned short a,
+	const unsigned short b,
+	const float currentNormalZ)
 {
 	const auto it = terrainEdges.find(CM_TerrainEdgeKey(a, b));
-	if (it == terrainEdges.end())
+	if (it == terrainEdges.end() || it->second.triangleCount != 2)
 		return false;
 
-	return it->second.triangleCount == 1 || it->second.crease;
-}
-
-static bool CM_TerrainEdgeCanProduceBounceNormal(const fvec3& a, const fvec3& b)
-{
-	const float edgeDx = b.x - a.x;
-	const float edgeDy = b.y - a.y;
-	const float edgeDz = b.z - a.z;
-	const float lengthSq = edgeDx * edgeDx + edgeDy * edgeDy + edgeDz * edgeDz;
-
-	if (lengthSq <= 1e-6f)
+	if (currentNormalZ >= 0.3f)
 		return false;
 
-	const float edgeZ = edgeDz / std::sqrt(lengthSq);
-	const float maxContactNormalZ = std::sqrt(std::max(0.0f, 1.0f - edgeZ * edgeZ));
+	const auto& info = it->second;
+	const float z0 = info.normals[0].z;
+	const float z1 = info.normals[1].z;
 
-	return maxContactNormalZ >= 0.3f;
+	return (z0 < 0.3f && z1 >= 0.3f)
+		|| (z1 < 0.3f && z0 >= 0.3f);
 }
 
-static bool CM_TerrainTriangleHasBounceEdgeContact(const cm_triangle& tri, const int triIndex)
+static bool CM_TerrainTriangleHasBounceStepEdge(const cm_triangle& tri, const int triIndex)
 {
 	const int index = 3 * triIndex;
 	const unsigned short i0 = cm->triIndices[index];
 	const unsigned short i1 = cm->triIndices[index + 1];
 	const unsigned short i2 = cm->triIndices[index + 2];
 
-	return (CM_TerrainEdgeIsPhysical(i0, i1) && CM_TerrainEdgeCanProduceBounceNormal(tri.a, tri.b))
-		|| (CM_TerrainEdgeIsPhysical(i1, i2) && CM_TerrainEdgeCanProduceBounceNormal(tri.b, tri.c))
-		|| (CM_TerrainEdgeIsPhysical(i2, i0) && CM_TerrainEdgeCanProduceBounceNormal(tri.c, tri.a));
+	return CM_TerrainEdgeIsStepTransition(i0, i1, tri.plane[2])
+		|| CM_TerrainEdgeIsStepTransition(i1, i2, tri.plane[2])
+		|| CM_TerrainEdgeIsStepTransition(i2, i0, tri.plane[2]);
 }
 
 std::unordered_map<CollisionPartition*, CollisionPartition*> discovered_partitions;
@@ -201,7 +186,7 @@ void cm_terrain::CM_AdvanceAabbTree(const CollisionAabbTree* aabbTree, const std
 			// generate a contact normal with z >= 0.3.
 			const bool faceBounceCandidate = tri.plane[2] >= 0.3f && tri.plane[2] < 0.7f;
 			tri.is_bounce = faceBounceCandidate
-				|| CM_TerrainTriangleHasBounceEdgeContact(tri, firstTri);
+				|| CM_TerrainTriangleHasBounceStepEdge(tri, firstTri);
 
 			tri.color[0] = color[0];
 			tri.color[1] = color[1];
