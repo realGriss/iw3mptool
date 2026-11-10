@@ -334,6 +334,11 @@ public:
 	static void Clear() { CClipMap::RestoreBrushCollisions(); m_pLevelGeometry.clear(); m_pWipGeometry.reset(); }
 	static void ClearThreadSafe() { std::unique_lock<std::mutex> lock(mtx); Clear(); }
 
+	// Drops cached geometry without touching source brush pointers. Use this
+	// after the engine has already replaced the active clipmap.
+	static void Discard() { m_pLevelGeometry.clear(); m_pWipGeometry.reset(); }
+	static void DiscardThreadSafe() { std::unique_lock<std::mutex> lock(mtx); Discard(); }
+
 	inline static auto& GetLock() { return mtx; }
 
 	template<typename Func>

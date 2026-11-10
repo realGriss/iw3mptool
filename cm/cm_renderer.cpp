@@ -79,9 +79,28 @@ void CM_DrawCollisionEdges(const std::vector<fvec3>& points, const float* colorF
 
 void CM_ShowCollision([[maybe_unused]] GfxViewParms* viewParms)
 {
+	static std::string overlayMapName;
 
-	if (CClipMap::Size() == 0 && CGentities::Size() == 0)
+	const bool hasCachedGeometry = CClipMap::Size() != 0 || CGentities::Size() != 0;
+	if (!hasCachedGeometry) {
+		overlayMapName.clear();
 		return;
+	}
+
+	const std::string currentMapName = cm && cm->name ? cm->name : "";
+	if (overlayMapName.empty()) {
+		overlayMapName = currentMapName;
+	}
+	else if (currentMapName != overlayMapName) {
+		// /devmap can replace the clipmap without calling CL_Disconnect.
+		// At this point old brush pointers may already be stale, so discard
+		// cached overlay geometry without restoring contents through them.
+		CClipMap::DiscardThreadSafe();
+		CGentities::ClearThreadSafe();
+		CStaticEntityFields::m_oGentityFields.clear();
+		overlayMapName = currentMapName;
+		return;
+	}
 
 	cplane_s frustum_planes[6];
 	CreateFrustumPlanes(frustum_planes);
