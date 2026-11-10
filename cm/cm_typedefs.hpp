@@ -164,6 +164,7 @@ struct cm_renderinfo
 	EPolyType poly_type = {};
 	bool only_colliding = {};
 	bool only_bounces = {};
+	bool hide_walkable_bounces = {};
 	int only_elevators = {};
 	float alpha = 0.7f;
 };
