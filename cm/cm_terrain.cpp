@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <ranges>
 #include <cmath>
+#include <cstdint>
 #include <com/com_vector.hpp>
 
 void CM_LoadAllTerrainToClipMapWithFilter(const std::string& filter)
@@ -42,6 +43,78 @@ static bool CM_TerrainTriangleHasWalkableEdge(const int triIndex)
 	return false;
 }
 
+struct TerrainEdgeInfo
+{
+	int triangleCount = 0;
+	fvec3 firstNormal = {};
+	bool crease = false;
+};
+
+static std::unordered_map<std::uint32_t, TerrainEdgeInfo> terrainEdges;
+
+static std::uint32_t CM_TerrainEdgeKey(const unsigned short a, const unsigned short b)
+{
+	const auto lo = std::min(a, b);
+	const auto hi = std::max(a, b);
+	return (static_cast<std::uint32_t>(lo) << 16) | hi;
+}
+
+static fvec3 CM_TerrainTriangleNormal(const int triIndex)
+{
+	const int index = 3 * triIndex;
+	vec4_t plane = {};
+	PlaneFromPointsASM(
+		plane,
+		cm->verts[cm->triIndices[index]],
+		cm->verts[cm->triIndices[index + 1]],
+		cm->verts[cm->triIndices[index + 2]]);
+
+	return { plane[0], plane[1], plane[2] };
+}
+
+static void CM_BuildTerrainEdgeInfo()
+{
+	terrainEdges.clear();
+
+	for (int triIndex = 0; triIndex < cm->triCount; ++triIndex) {
+		const int index = 3 * triIndex;
+		const unsigned short indices[3] = {
+			cm->triIndices[index],
+			cm->triIndices[index + 1],
+			cm->triIndices[index + 2]
+		};
+		const auto normal = CM_TerrainTriangleNormal(triIndex);
+
+		for (int edge = 0; edge < 3; ++edge) {
+			const auto key = CM_TerrainEdgeKey(indices[edge], indices[(edge + 1) % 3]);
+			auto& info = terrainEdges[key];
+
+			if (info.triangleCount == 0) {
+				info.firstNormal = normal;
+			}
+			else {
+				const float dot = info.firstNormal.x * normal.x
+					+ info.firstNormal.y * normal.y
+					+ info.firstNormal.z * normal.z;
+
+				if (dot < 0.999f)
+					info.crease = true;
+			}
+
+			++info.triangleCount;
+		}
+	}
+}
+
+static bool CM_TerrainEdgeIsPhysical(const unsigned short a, const unsigned short b)
+{
+	const auto it = terrainEdges.find(CM_TerrainEdgeKey(a, b));
+	if (it == terrainEdges.end())
+		return false;
+
+	return it->second.triangleCount == 1 || it->second.crease;
+}
+
 static bool CM_TerrainEdgeCanProduceBounceNormal(const fvec3& a, const fvec3& b)
 {
 	const float edgeDx = b.x - a.x;
@@ -58,11 +131,16 @@ static bool CM_TerrainEdgeCanProduceBounceNormal(const fvec3& a, const fvec3& b)
 	return maxContactNormalZ >= 0.3f;
 }
 
-static bool CM_TerrainTriangleHasBounceEdgeContact(const cm_triangle& tri)
+static bool CM_TerrainTriangleHasBounceEdgeContact(const cm_triangle& tri, const int triIndex)
 {
-	return CM_TerrainEdgeCanProduceBounceNormal(tri.a, tri.b)
-		|| CM_TerrainEdgeCanProduceBounceNormal(tri.b, tri.c)
-		|| CM_TerrainEdgeCanProduceBounceNormal(tri.c, tri.a);
+	const int index = 3 * triIndex;
+	const unsigned short i0 = cm->triIndices[index];
+	const unsigned short i1 = cm->triIndices[index + 1];
+	const unsigned short i2 = cm->triIndices[index + 2];
+
+	return (CM_TerrainEdgeIsPhysical(i0, i1) && CM_TerrainEdgeCanProduceBounceNormal(tri.a, tri.b))
+		|| (CM_TerrainEdgeIsPhysical(i1, i2) && CM_TerrainEdgeCanProduceBounceNormal(tri.b, tri.c))
+		|| (CM_TerrainEdgeIsPhysical(i2, i0) && CM_TerrainEdgeCanProduceBounceNormal(tri.c, tri.a));
 }
 
 std::unordered_map<CollisionPartition*, CollisionPartition*> discovered_partitions;
@@ -73,6 +151,7 @@ bool CM_DiscoverTerrain([[maybe_unused]]const std::unordered_set<std::string>& f
 
 	try {
 		discovered_partitions.clear();
+		CM_BuildTerrainEdgeInfo();
 		for (const auto i : std::views::iota(0u, cm->numLeafs)) {
 			cm_terrain terrain;
 
@@ -136,7 +215,7 @@ void cm_terrain::CM_AdvanceAabbTree(const CollisionAabbTree* aabbTree, const std
 			// generate a contact normal with z >= 0.3.
 			tri.is_bounce = tri.plane[2] >= 0.3f
 				|| CM_TerrainTriangleHasWalkableEdge(firstTri)
-				|| CM_TerrainTriangleHasBounceEdgeContact(tri);
+				|| CM_TerrainTriangleHasBounceEdgeContact(tri, firstTri);
 
 			tri.color[0] = color[0];
 			tri.color[1] = color[1];
