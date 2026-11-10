@@ -3,6 +3,7 @@
 #include <string>
 
 void hmm_f();
+void dyn_load_f();
 
 void CM_AddModel(const struct GfxStaticModelDrawInst* model);
 struct cm_model CM_MakeModel(const GfxStaticModelDrawInst* model);
