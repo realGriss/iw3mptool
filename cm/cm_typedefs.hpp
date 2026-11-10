@@ -61,7 +61,7 @@ struct cm_triangle
 	vec4_t color = {};
 	char* material = {};
 	bool has_collision = false;
-	//bool edge_walkable = true;
+	bool is_bounce = false;
 
 	inline fvec3 get_mins() const noexcept {
 		fvec3 lowest = FLT_MAX;
