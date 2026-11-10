@@ -11,6 +11,70 @@
 #include <iostream>
 #include <array>
 
+namespace
+{
+	void QuatToAxisLocal(const float* q, float axis[3][3])
+	{
+		const float x = q[0];
+		const float y = q[1];
+		const float z = q[2];
+		const float w = q[3];
+
+		axis[0][0] = 1.0f - 2.0f * (y * y + z * z);
+		axis[0][1] = 2.0f * (x * y - z * w);
+		axis[0][2] = 2.0f * (x * z + y * w);
+		axis[1][0] = 2.0f * (x * y + z * w);
+		axis[1][1] = 1.0f - 2.0f * (x * x + z * z);
+		axis[1][2] = 2.0f * (y * z - x * w);
+		axis[2][0] = 2.0f * (x * z - y * w);
+		axis[2][1] = 2.0f * (y * z + x * w);
+		axis[2][2] = 1.0f - 2.0f * (x * x + y * y);
+	}
+
+	fvec3 TransformByAxis(const fvec3& point, const float axis[3][3])
+	{
+		return {
+			point.x * axis[0][0] + point.y * axis[1][0] + point.z * axis[2][0],
+			point.x * axis[0][1] + point.y * axis[1][1] + point.z * axis[2][1],
+			point.x * axis[0][2] + point.y * axis[1][2] + point.z * axis[2][2]
+		};
+	}
+
+	void AddBoxTriangles(std::vector<cm_triangle>& tris, const PhysGeomInfo& geom, const GfxPlacement& pose)
+	{
+		float poseAxis[3][3]{};
+		QuatToAxisLocal(pose.quat, poseAxis);
+
+		std::array<fvec3, 8> corners;
+		for (int i = 0; i < 8; ++i) {
+			const fvec3 localCorner = {
+				(i & 1) ? geom.halfLengths[0] : -geom.halfLengths[0],
+				(i & 2) ? geom.halfLengths[1] : -geom.halfLengths[1],
+				(i & 4) ? geom.halfLengths[2] : -geom.halfLengths[2]
+			};
+
+			const fvec3 oriented = TransformByAxis(localCorner, geom.orientation) + fvec3(geom.offset);
+			corners[i] = TransformByAxis(oriented, poseAxis) + fvec3(pose.origin);
+		}
+
+		static constexpr int faces[12][3] = {
+			{0,2,3},{0,3,1}, {4,5,7},{4,7,6},
+			{0,1,5},{0,5,4}, {2,6,7},{2,7,3},
+			{0,4,6},{0,6,2}, {1,3,7},{1,7,5}
+		};
+
+		for (const auto& face : faces) {
+			cm_triangle tri{ corners[face[0]], corners[face[1]], corners[face[2]] };
+			PlaneFromPointsASM(tri.plane, tri.a, tri.b, tri.c);
+			tri.color[0] = 0.0f;
+			tri.color[1] = 0.7f;
+			tri.color[2] = 1.0f;
+			tri.color[3] = 0.3f;
+			tris.emplace_back(tri);
+		}
+	}
+}
+
 void hmm_f()
 {
 	const auto num_args = cmd_args->argc[cmd_args->nesting];
@@ -35,6 +99,49 @@ void hmm_f()
 
 	CM_LoadAllModelsToClipMap(filter);
 
+}
+
+void dyn_load_f()
+{
+	const auto num_args = cmd_args->argc[cmd_args->nesting];
+
+	if (num_args == 1) {
+		CClipMap::ClearAllOfTypeThreadSafe(cm_geomtype::model);
+		return;
+	}
+
+	std::string filter;
+	for (int i = 1; i < num_args; ++i) {
+		filter += *(cmd_args->argv[cmd_args->nesting] + i);
+		filter += " ";
+	}
+
+	const auto filters = CM_TokenizeFilters(filter);
+	std::unique_lock<std::mutex> lock(CClipMap::GetLock());
+
+	for (unsigned int i = 0; i < cm->dynEntCount[0]; ++i) {
+		const auto& def = cm->dynEntDefList[0][i];
+		if (!def.xModel || !CM_IsMatchingFilter(filters, def.xModel->name))
+			continue;
+
+		std::vector<cm_triangle> tris;
+		if (def.xModel->physGeoms) {
+			for (unsigned int geomIndex = 0; geomIndex < def.xModel->physGeoms->count; ++geomIndex) {
+				const auto& geom = def.xModel->physGeoms->geoms[geomIndex];
+				if (geom.type == 1) // PHYS_GEOM_BOX
+					AddBoxTriangles(tris, geom, def.pose);
+			}
+		}
+
+		if (!tris.empty()) {
+			CClipMap::Insert(std::make_unique<cm_model>(
+				def.xModel->name,
+				fvec3(def.pose.origin),
+				fvec3{},
+				1.0f,
+				tris));
+		}
+	}
 }
 
 void CM_LoadAllModelsToClipMap(const std::string& filter)
