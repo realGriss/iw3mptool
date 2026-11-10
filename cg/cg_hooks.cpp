@@ -10,10 +10,62 @@
 #include "com/com_channel.hpp"
 
 #include <cmath>
+#include <array>
 #include "g/g_trigger.hpp"
 #include "menu/menu_parse.hpp"
 #include "cl/cl_main.hpp"
 #include "g/g_spawn.hpp"
+
+struct BounceTraceSample
+{
+	float traceDz = 0.0f;
+	float fraction = 0.0f;
+	float normal[3] = {};
+	bool walkable = false;
+	bool startsolid = false;
+	TraceHitType hitType = TRACE_HITTYPE_NONE;
+	unsigned short hitId = 0;
+	const char* material = nullptr;
+	int contents = 0;
+};
+
+static constexpr std::size_t kBounceTraceHistory = 12;
+static std::array<BounceTraceSample, kBounceTraceHistory> bounceTraceHistory{};
+static std::size_t bounceTraceWriteIndex = 0;
+static std::size_t bounceTraceCount = 0;
+
+void CG_DumpBounceTraceDebug()
+{
+	if (bounceTraceCount == 0) {
+		Com_Printf("[bounce-trace] no buffered step traces\n");
+		return;
+	}
+
+	Com_Printf("[bounce-trace] dumping %u most recent step traces\n",
+		static_cast<unsigned>(bounceTraceCount));
+
+	const std::size_t first =
+		(bounceTraceWriteIndex + kBounceTraceHistory - bounceTraceCount) % kBounceTraceHistory;
+
+	for (std::size_t i = 0; i < bounceTraceCount; ++i) {
+		const auto& sample = bounceTraceHistory[(first + i) % kBounceTraceHistory];
+		Com_Printf(
+			"[bounce-trace %02u] dz=%.3f frac=%.6f normal=(%.6f %.6f %.6f) walkable=%d "
+			"startsolid=%d hitType=%d hitId=%u material=%s contents=0x%X\n",
+			static_cast<unsigned>(i),
+			sample.traceDz,
+			sample.fraction,
+			sample.normal[0], sample.normal[1], sample.normal[2],
+			sample.walkable ? 1 : 0,
+			sample.startsolid ? 1 : 0,
+			static_cast<int>(sample.hitType),
+			static_cast<unsigned>(sample.hitId),
+			sample.material ? sample.material : "<null>",
+			sample.contents);
+	}
+
+	bounceTraceCount = 0;
+}
 
 static void CG_TraceBounceDebug(
 	trace_t* result,
@@ -36,8 +88,6 @@ static void CG_TraceBounceDebug(
 	const float traceDy = end[1] - start[1];
 	const float traceDz = end[2] - start[2];
 
-	// PM_StepSlideMove's relevant down trace is vertical, short, and uses
-	// the player's capsule bounds. Ignore ordinary horizontal movement traces.
 	if (std::fabs(traceDx) > 0.01f || std::fabs(traceDy) > 0.01f)
 		return;
 	if (traceDz >= -0.01f || traceDz < -40.0f)
@@ -49,18 +99,22 @@ static void CG_TraceBounceDebug(
 	if (result->fraction >= 1.0f || result->allsolid)
 		return;
 
-	Com_Printf(
-		"[bounce-trace] dz=%.3f frac=%.6f normal=(%.6f %.6f %.6f) walkable=%d "
-		"startsolid=%d hitType=%d hitId=%u material=%s contents=0x%X\n",
-		traceDz,
-		result->fraction,
-		result->normal[0], result->normal[1], result->normal[2],
-		result->walkable ? 1 : 0,
-		result->startsolid ? 1 : 0,
-		static_cast<int>(result->hitType),
-		static_cast<unsigned>(result->hitId),
-		result->material ? result->material : "<null>",
-		result->contents);
+	auto& sample = bounceTraceHistory[bounceTraceWriteIndex];
+	sample.traceDz = traceDz;
+	sample.fraction = result->fraction;
+	sample.normal[0] = result->normal[0];
+	sample.normal[1] = result->normal[1];
+	sample.normal[2] = result->normal[2];
+	sample.walkable = result->walkable;
+	sample.startsolid = result->startsolid;
+	sample.hitType = result->hitType;
+	sample.hitId = result->hitId;
+	sample.material = result->material;
+	sample.contents = result->contents;
+
+	bounceTraceWriteIndex = (bounceTraceWriteIndex + 1) % kBounceTraceHistory;
+	if (bounceTraceCount < kBounceTraceHistory)
+		++bounceTraceCount;
 }
 
 static void CG_CreateHooksInternal();
