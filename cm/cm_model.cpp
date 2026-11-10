@@ -11,6 +11,8 @@
 #include <iostream>
 #include <array>
 
+[[nodiscard]] static std::vector<cm_triangle> CM_GetCollisionStaticModelTriangles(const cStaticModel_s* model, const float* color);
+
 void hmm_f()
 {
 	const auto num_args = cmd_args->argc[cmd_args->nesting];
