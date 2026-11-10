@@ -239,7 +239,9 @@ void __cdecl adjacency_winding(adjacencyWinding_t* w, float* points, vec3_t norm
 		winding_points.emplace_back(fvec3{ &points[winding * 3] });
 	}
 
-	brush->windings.emplace_back(cm_winding{ winding_points, normal, CClipMap::m_vecWipGeometryColor });
+	cm_winding winding{ winding_points, normal, CClipMap::m_vecWipGeometryColor };
+	winding.is_covered = CM_WindingCoveredBySolidBrush(winding, brush->brush);
+	brush->windings.emplace_back(std::move(winding));
 
 }
 __declspec(naked) void __brush::__asm_adjacency_winding()
@@ -313,6 +315,80 @@ char* CM_MaterialForNormal(const cbrush_t* target, const fvec3& normals)
 bool CM_BrushHasCollision(const cbrush_t* brush)
 {
 	return (brush->contents & MASK_PLAYERSOLID) != 0;
+}
+
+static bool CM_PointInsideSolidBrush(const fvec3& point, const cbrush_t* brush, const float epsilon)
+{
+	if (!brush || !brush->has_collision())
+		return false;
+
+	if (point.x < brush->mins[0] - epsilon || point.x > brush->maxs[0] + epsilon ||
+		point.y < brush->mins[1] - epsilon || point.y > brush->maxs[1] + epsilon ||
+		point.z < brush->mins[2] - epsilon || point.z > brush->maxs[2] + epsilon)
+		return false;
+
+	for (unsigned int i = 0; i < brush->numsides; ++i) {
+		const auto* plane = brush->sides[i].plane;
+		const float distance =
+			point.x * plane->normal[0] +
+			point.y * plane->normal[1] +
+			point.z * plane->normal[2] -
+			plane->dist;
+
+		if (distance > epsilon)
+			return false;
+	}
+
+	return true;
+}
+
+bool CM_WindingCoveredBySolidBrush(const cm_winding& winding, const cbrush_t* sourceBrush)
+{
+	if (!winding.is_bounce || winding.points.empty())
+		return false;
+
+	constexpr float surfaceOffset = 0.5f;
+	constexpr float planeEpsilon = 0.05f;
+	constexpr float vertexInset = 0.8f;
+
+	const fvec3 center = winding.get_center();
+
+	const auto sampleCovered = [&](const fvec3& sample)
+	{
+		const fvec3 probe = sample + winding.normals * surfaceOffset;
+
+		for (unsigned int i = 0; i < cm->numBrushes; ++i) {
+			const cbrush_t* candidate = &cm->brushes[i];
+
+			if (candidate == sourceBrush)
+				continue;
+
+			if (CM_PointInsideSolidBrush(probe, candidate, planeEpsilon))
+				return true;
+		}
+
+		return false;
+	};
+
+	// Only suppress a bounce face when every sampled part is buried by
+	// another player-solid world brush. Partially exposed faces stay visible.
+	if (!sampleCovered(center))
+		return false;
+
+	for (std::size_t i = 0; i < winding.points.size(); ++i) {
+		const fvec3& point = winding.points[i];
+		const fvec3& next = winding.points[(i + 1) % winding.points.size()];
+
+		const fvec3 insetVertex = center + (point - center) * vertexInset;
+		if (!sampleCovered(insetVertex))
+			return false;
+
+		const fvec3 edgeMidpoint = (point + next) / 2.0f;
+		if (!sampleCovered(edgeMidpoint))
+			return false;
+	}
+
+	return true;
 }
 
 
