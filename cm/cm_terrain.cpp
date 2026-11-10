@@ -5,6 +5,7 @@
 #include "cg/cg_offsets.hpp"
 #include <unordered_map>
 #include <ranges>
+#include <cmath>
 #include <com/com_vector.hpp>
 
 void CM_LoadAllTerrainToClipMapWithFilter(const std::string& filter)
@@ -25,6 +26,43 @@ bool CM_AabbTreeHasCollision(const CollisionAabbTree* tree)
 {
 	const dmaterial_t* materialInfo = &cm->materials[tree->materialIndex];
 	return (materialInfo->contentFlags & MASK_PLAYERSOLID) != 0;
+}
+
+static bool CM_TerrainTriangleHasWalkableEdge(const int triIndex)
+{
+	if (!cm->triEdgeIsWalkable)
+		return false;
+
+	for (int edge = 0; edge < 3; ++edge) {
+		const int bitIndex = 3 * triIndex + edge;
+		if ((cm->triEdgeIsWalkable[bitIndex >> 3] & (1 << (bitIndex & 7))) != 0)
+			return true;
+	}
+
+	return false;
+}
+
+static bool CM_TerrainEdgeCanProduceBounceNormal(const fvec3& a, const fvec3& b)
+{
+	const float dx = b.x - a.x;
+	const float dy = b.y - a.y;
+	const float dz = b.z - a.z;
+	const float lengthSq = dx * dx + dy * dy + dz * dz;
+
+	if (lengthSq <= 1e-6f)
+		return false;
+
+	const float edgeZ = dz / std::sqrt(lengthSq);
+	const float maxContactNormalZ = std::sqrt(std::max(0.0f, 1.0f - edgeZ * edgeZ));
+
+	return maxContactNormalZ >= 0.3f;
+}
+
+static bool CM_TerrainTriangleHasBounceEdgeContact(const cm_triangle& tri)
+{
+	return CM_TerrainEdgeCanProduceBounceNormal(tri.a, tri.b)
+		|| CM_TerrainEdgeCanProduceBounceNormal(tri.b, tri.c)
+		|| CM_TerrainEdgeCanProduceBounceNormal(tri.c, tri.a);
 }
 
 std::unordered_map<CollisionPartition*, CollisionPartition*> discovered_partitions;
@@ -91,6 +129,14 @@ void cm_terrain::CM_AdvanceAabbTree(const CollisionAabbTree* aabbTree, const std
 			tri.c = cm->verts[cm->triIndices[triIndice + 2]];
 
 			PlaneFromPointsASM(tri.plane, tri.a, tri.b, tri.c);
+
+			// PM_StepSlideMove tests the runtime trace normal, not necessarily
+			// the triangle plane. Capsule-vs-edge contacts produce a normal
+			// perpendicular to the edge, so include triangles whose edges can
+			// generate a contact normal with z >= 0.3.
+			tri.is_bounce = tri.plane[2] >= 0.3f
+				|| CM_TerrainTriangleHasWalkableEdge(firstTri)
+				|| CM_TerrainTriangleHasBounceEdgeContact(tri);
 
 			tri.color[0] = color[0];
 			tri.color[1] = color[1];
