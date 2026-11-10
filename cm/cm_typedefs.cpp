@@ -62,6 +62,9 @@ bool cm_brush::RB_MakeInteriorsRenderable(const cm_renderinfo& info) const
 		if (info.only_bounces && w.is_bounce == false)
 			continue;
 
+		if (info.only_bounces && info.hide_covered_bounces && w.is_covered)
+			continue;
+
 		if (info.only_elevators && w.is_elevator == false)
 			continue;
 
@@ -111,6 +114,9 @@ bool cm_brush::RB_MakeOutlinesRenderable(const cm_renderinfo& info, int& nverts)
 	for (const auto& w : windings) {
 
 		if (info.only_bounces && w.is_bounce == false)
+			continue;
+
+		if (info.only_bounces && info.hide_covered_bounces && w.is_covered)
 			continue;
 
 		if (info.only_elevators && w.is_elevator == false)

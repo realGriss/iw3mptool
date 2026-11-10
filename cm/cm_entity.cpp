@@ -380,7 +380,10 @@ bool CBrushModel::CBrush::RB_MakeInteriorsRenderable(const cm_renderinfo& info) 
 	if (BoundsInView(center + m_pSourceBrush->mins, center + m_pSourceBrush->maxs, info.frustum_planes, info.num_planes) == false)
 		return false;
 
-	return m_oCurrentGeometry.RB_MakeInteriorsRenderable(info);
+	auto entityInfo = info;
+	entityInfo.hide_covered_bounces = false;
+
+	return m_oCurrentGeometry.RB_MakeInteriorsRenderable(entityInfo);
 }
 bool CBrushModel::CBrush::RB_MakeOutlinesRenderable(const cm_renderinfo& info, int& nverts) const
 {
@@ -392,7 +395,10 @@ bool CBrushModel::CBrush::RB_MakeOutlinesRenderable(const cm_renderinfo& info, i
 	if (BoundsInView(center + m_pSourceBrush->mins, center + m_pSourceBrush->maxs, info.frustum_planes, info.num_planes) == false)
 		return false;
 
-	return m_oCurrentGeometry.RB_MakeOutlinesRenderable(info, nverts);
+	auto entityInfo = info;
+	entityInfo.hide_covered_bounces = false;
+
+	return m_oCurrentGeometry.RB_MakeOutlinesRenderable(entityInfo, nverts);
 }
 
 CBrushModel::CTerrain::CTerrain(gentity_s* const g, const cLeaf_t* const leaf) : CIndividualBrushModel(g), m_pSourceLeaf(leaf) {}
