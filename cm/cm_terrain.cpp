@@ -27,6 +27,20 @@ bool CM_AabbTreeHasCollision(const CollisionAabbTree* tree)
 	return (materialInfo->contentFlags & MASK_PLAYERSOLID) != 0;
 }
 
+static bool CM_TerrainTriangleHasWalkableEdge(const int triIndex)
+{
+	if (!cm->triEdgeIsWalkable)
+		return false;
+
+	for (int edge = 0; edge < 3; ++edge) {
+		const int bitIndex = 3 * triIndex + edge;
+		if ((cm->triEdgeIsWalkable[bitIndex >> 3] & (1 << (bitIndex & 7))) != 0)
+			return true;
+	}
+
+	return false;
+}
+
 std::unordered_map<CollisionPartition*, CollisionPartition*> discovered_partitions;
 
 
@@ -91,6 +105,11 @@ void cm_terrain::CM_AdvanceAabbTree(const CollisionAabbTree* aabbTree, const std
 			tri.c = cm->verts[cm->triIndices[triIndice + 2]];
 
 			PlaneFromPointsASM(tri.plane, tri.a, tri.b, tri.c);
+
+			// CoD4 only rejects the step projection when the contact is both
+			// non-walkable and steeper than normal.z < 0.3. Terrain edge
+			// contacts can explicitly set trace.walkable via triEdgeIsWalkable.
+			tri.is_bounce = tri.plane[2] >= 0.3f || CM_TerrainTriangleHasWalkableEdge(firstTri);
 
 			tri.color[0] = color[0];
 			tri.color[1] = color[1];
