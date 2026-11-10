@@ -129,6 +129,8 @@ void CM_LoadDvars()
 	Dvar_RegisterBool("pm_velocity", dvar_flags::saved, false, "show player velocity");
 	Dvar_RegisterBool("pm_hitbox", dvar_flags::saved, false, "show player hitbox (when in third person)");
 	Dvar_RegisterBool("pm_debug", dvar_flags::saved, false, "show debug information");
+	Dvar_RegisterBool("pm_bounceTraceDebug", dvar_flags::none, false,
+		"Print short vertical player capsule traces used by step/bounce movement");
 
 	Cmd_AddCommand("xm_load", hmm_f);
 
