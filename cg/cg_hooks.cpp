@@ -117,6 +117,40 @@ static void CG_TraceBounceDebug(
 		++bounceTraceCount;
 }
 
+static void CG_ProjectVelocityBounceDebug()
+{
+	float* normal = nullptr;
+	float* velocity = nullptr;
+
+	__asm mov normal, edi
+	__asm mov velocity, esi
+
+	const float inputZ = velocity ? velocity[2] : 0.0f;
+
+	auto* projectHook = hooktable::find<void>(HOOK_PREFIX("PM_ProjectVelocityBounceDebug"));
+	projectHook->call();
+
+	static dvar_s* debug = Dvar_FindMalleableVar("pm_bounceTraceDebug");
+	if (!debug || !debug->current.enabled || !normal || !velocity)
+		return;
+
+	const float outputZ = velocity[2];
+
+	// A real CoD4 bounce is produced when PM_ProjectVelocity turns the
+	// incoming movement into upward velocity along the contact plane.
+	if (inputZ > 0.0f || outputZ <= 0.0f)
+		return;
+
+	Com_Printf(
+		"[bounce-detected] velocityZ %.6f -> %.6f normal=(%.6f %.6f %.6f)\n",
+		inputZ,
+		outputZ,
+		normal[0], normal[1], normal[2]);
+
+	CG_DumpBounceTraceDebug();
+}
+
+
 static void CG_CreateHooksInternal();
 void CG_CreateHooks()
 {
@@ -130,6 +164,8 @@ void CG_CreateHooksInternal()
 	hooktable::preserver<void, GfxViewParms*>(HOOK_PREFIX("RB_DrawDebug"), 0x658860, RB_DrawDebug);
 	hooktable::preserver<void, trace_t*, const float*, const float*, const float*, const float*, int, int>(
 		HOOK_PREFIX("CG_TraceBounceDebug"), 0x45A230, CG_TraceBounceDebug);
+	hooktable::preserver<void>(
+		HOOK_PREFIX("PM_ProjectVelocityBounceDebug"), 0x40E330, CG_ProjectVelocityBounceDebug);
 	hooktable::preserver<void, int>(HOOK_PREFIX("CL_Disconnect"), 0x4696B0, CL_Disconnect);
 
 
