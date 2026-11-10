@@ -44,13 +44,19 @@ void CM_LoadAllModelsToClipMap(const std::string& filter)
 	if (filters.empty())
 		return;
 
-	for (const auto i : std::views::iota(0u, gfxWorld->dpvs.smodelCount)) {
-	//for (const auto i : std::views::iota(0u, 1u)) {
+	for (const auto i : std::views::iota(0u, cm->numStaticModels)) {
+		const auto* model = &cm->staticModelList[i];
 
-		if (!CM_IsMatchingFilter(filters, gfxWorld->dpvs.smodelDrawInsts[i].model->name))
+		if (!model->xmodel || !CM_IsMatchingFilter(filters, model->xmodel->name))
 			continue;
 
-		CM_AddModel(&gfxWorld->dpvs.smodelDrawInsts[i]);
+		CClipMap::Insert(std::make_unique<cm_model>(
+			model->xmodel->name,
+			fvec3(model->origin),
+			fvec3{},
+			1.0f,
+			CM_GetCollisionStaticModelTriangles(model, vec4_t{ 1, 0, 0, 1 })
+		));
 	}
 }
 
@@ -91,6 +97,77 @@ std::array<fvec3, 3> reconstruct_triangle_vertices(const XModelCollTri_s& tri) {
 	vertices[2] = solve_3x3_system(A, { tri.plane[3], tri.svec[3], tri.tvec[3] + 1.0f });
 
 	return vertices;
+}
+
+
+static bool invert_3x3(const float in[3][3], float out[3][3])
+{
+	const float det =
+		in[0][0] * (in[1][1] * in[2][2] - in[1][2] * in[2][1]) -
+		in[0][1] * (in[1][0] * in[2][2] - in[1][2] * in[2][0]) +
+		in[0][2] * (in[1][0] * in[2][1] - in[1][1] * in[2][0]);
+
+	if (std::abs(det) < 1e-6f)
+		return false;
+
+	const float invDet = 1.0f / det;
+
+	out[0][0] =  (in[1][1] * in[2][2] - in[1][2] * in[2][1]) * invDet;
+	out[0][1] = -(in[0][1] * in[2][2] - in[0][2] * in[2][1]) * invDet;
+	out[0][2] =  (in[0][1] * in[1][2] - in[0][2] * in[1][1]) * invDet;
+	out[1][0] = -(in[1][0] * in[2][2] - in[1][2] * in[2][0]) * invDet;
+	out[1][1] =  (in[0][0] * in[2][2] - in[0][2] * in[2][0]) * invDet;
+	out[1][2] = -(in[0][0] * in[1][2] - in[0][2] * in[1][0]) * invDet;
+	out[2][0] =  (in[1][0] * in[2][1] - in[1][1] * in[2][0]) * invDet;
+	out[2][1] = -(in[0][0] * in[2][1] - in[0][1] * in[2][0]) * invDet;
+	out[2][2] =  (in[0][0] * in[1][1] - in[0][1] * in[1][0]) * invDet;
+
+	return true;
+}
+
+static fvec3 transform_vector(const fvec3& in, const float axis[3][3])
+{
+	return {
+		in.x * axis[0][0] + in.y * axis[1][0] + in.z * axis[2][0],
+		in.x * axis[0][1] + in.y * axis[1][1] + in.z * axis[2][1],
+		in.x * axis[0][2] + in.y * axis[1][2] + in.z * axis[2][2]
+	};
+}
+
+[[nodiscard]] static std::vector<cm_triangle> CM_GetCollisionStaticModelTriangles(const cStaticModel_s* model, const float* color)
+{
+	if (!model || !model->xmodel)
+		return {};
+
+	float scaledAxis[3][3]{};
+	if (!invert_3x3(model->invScaledAxis, scaledAxis))
+		return {};
+
+	std::vector<cm_triangle> tris;
+
+	for (int i = 0; i < model->xmodel->numCollSurfs; ++i) {
+		const auto& collSurf = model->xmodel->collSurfs[i];
+
+		for (int j = 0; j < collSurf.numCollTris; ++j) {
+			const auto pts = reconstruct_triangle_vertices(collSurf.collTris[j]);
+			cm_triangle tri{
+				transform_vector(pts[0], scaledAxis) + fvec3(model->origin),
+				transform_vector(pts[1], scaledAxis) + fvec3(model->origin),
+				transform_vector(pts[2], scaledAxis) + fvec3(model->origin)
+			};
+
+			PlaneFromPointsASM(tri.plane, tri.a, tri.b, tri.c);
+
+			tri.color[0] = color[0];
+			tri.color[1] = color[1];
+			tri.color[2] = color[2];
+			tri.color[3] = 0.3f;
+
+			tris.emplace_back(tri);
+		}
+	}
+
+	return tris;
 }
 
 [[nodiscard]] static std::vector<cm_triangle> CM_GetModelTriangles2(const GfxStaticModelDrawInst* model, const float* color)
