@@ -259,7 +259,8 @@ bool cm_terrain::RB_MakeOutlinesRenderable(const cm_renderinfo& info, int& nvert
 		if (tri.has_collision == false && info.only_colliding)
 			continue;
 
-		if ((tri.plane[2] < 0.3f || tri.plane[2] > 0.7f) && info.only_bounces)
+		const bool faceBounce = tri.plane[2] >= 0.3f && tri.plane[2] <= 0.7f;
+		if (info.only_bounces && !faceBounce && tri.bounce_edge_mask == 0)
 			continue;
 
 		if (tri.a.dist(cgs->predictedPlayerState.origin) > info.draw_dist)
@@ -296,7 +297,26 @@ bool cm_terrain::RB_MakeOutlinesRenderable(const cm_renderinfo& info, int& nvert
 		points[1] = (tri.b);
 		points[2] = (tri.c);
 
-		nverts = CM_MakeOutlinesRenderable(points, c, info.depth_test, nverts);
+		if (info.only_bounces && !faceBounce) {
+			// Edge-driven bounce candidates are rendered as the actual lower rim
+			// only; do not color the entire steep triangle as bounceable.
+			constexpr int edgePairs[3][2] = { { 0, 1 }, { 1, 2 }, { 2, 0 } };
+			for (int edge = 0; edge < 3; ++edge) {
+				if ((tri.bounce_edge_mask & (1 << edge)) == 0)
+					continue;
+
+				nverts = RB_AddDebugLine(
+					CGDebugData::g_debugPolyVerts,
+					info.depth_test,
+					points[edgePairs[edge][0]].As<float*>(),
+					points[edgePairs[edge][1]].As<float*>(),
+					c,
+					nverts);
+			}
+		}
+		else {
+			nverts = CM_MakeOutlinesRenderable(points, c, info.depth_test, nverts);
+		}
 		state = true;
 	}
 
