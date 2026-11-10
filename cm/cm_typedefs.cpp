@@ -198,7 +198,7 @@ bool cm_terrain::RB_MakeInteriorsRenderable(const cm_renderinfo& info) const
 		if (tri.has_collision == false && info.only_colliding)
 			continue;
 
-		if ((tri.plane[2] < 0.3f || tri.plane[2] > 0.7f) && info.only_bounces)
+		if (info.only_bounces && !tri.is_bounce)
 			continue;
 
 		if (tri.a.dist(cgs->predictedPlayerState.origin) > info.draw_dist)
@@ -259,7 +259,7 @@ bool cm_terrain::RB_MakeOutlinesRenderable(const cm_renderinfo& info, int& nvert
 		if (tri.has_collision == false && info.only_colliding)
 			continue;
 
-		if ((tri.plane[2] < 0.3f || tri.plane[2] > 0.7f) && info.only_bounces)
+		if (info.only_bounces && !tri.is_bounce)
 			continue;
 
 		if (tri.a.dist(cgs->predictedPlayerState.origin) > info.draw_dist)
