@@ -119,6 +119,8 @@ void CM_LoadDvars()
 	Dvar_RegisterBool("cm_depthTest", dvar_flags::saved, true, "Select whether to use depth test in surface display");
 	
 	Dvar_RegisterBool("cm_onlyBounces", dvar_flags::saved, false, "Only display surfaces which can be bounced");
+	Dvar_RegisterBool("cm_hideWalkableBounces", dvar_flags::saved, false,
+		"Hide bounce surfaces the game classifies as walkable");
 	Dvar_RegisterBool("cm_onlyElevators", dvar_flags::saved, false, "Only display surfaces which can be elevated");
 	Dvar_RegisterBool("cm_disableTriggers", dvar_flags::none, false, "Triggers will not have any effect");
 
