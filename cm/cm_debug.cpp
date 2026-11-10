@@ -131,6 +131,7 @@ void CM_LoadDvars()
 	Dvar_RegisterBool("pm_debug", dvar_flags::saved, false, "show debug information");
 
 	Cmd_AddCommand("xm_load", hmm_f);
+	Cmd_AddCommand("dyn_load", dyn_load_f);
 
 }
 
