@@ -305,13 +305,11 @@ bool cm_terrain::RB_MakeOutlinesRenderable(const cm_renderinfo& info, int& nvert
 				if ((tri.bounce_edge_mask & (1 << edge)) == 0)
 					continue;
 
-				nverts = RB_AddDebugLine(
-					CGDebugData::g_debugPolyVerts,
-					info.depth_test,
-					points[edgePairs[edge][0]].As<float*>(),
-					points[edgePairs[edge][1]].As<float*>(),
-					c,
-					nverts);
+				std::vector<fvec3> edgePoints = {
+					points[edgePairs[edge][0]],
+					points[edgePairs[edge][1]]
+				};
+				nverts = CM_MakeOutlinesRenderable(edgePoints, c, info.depth_test, nverts);
 			}
 		}
 		else {
