@@ -115,6 +115,7 @@ struct cm_winding
 	vec4_t color;
 	bool is_bounce = {};
 	bool is_elevator = {};
+	bool is_covered = {};
 
 	inline fvec3 get_mins() const noexcept {
 		if (points.empty()) return {};
@@ -164,6 +165,7 @@ struct cm_renderinfo
 	EPolyType poly_type = {};
 	bool only_colliding = {};
 	bool only_bounces = {};
+	bool hide_covered_bounces = {};
 	int only_elevators = {};
 	float alpha = 0.7f;
 };
