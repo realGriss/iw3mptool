@@ -213,8 +213,8 @@ void cm_terrain::CM_AdvanceAabbTree(const CollisionAabbTree* aabbTree, const std
 			// the triangle plane. Capsule-vs-edge contacts produce a normal
 			// perpendicular to the edge, so include triangles whose edges can
 			// generate a contact normal with z >= 0.3.
-			tri.is_bounce = tri.plane[2] >= 0.3f
-				|| CM_TerrainTriangleHasWalkableEdge(firstTri)
+			const bool faceBounceCandidate = tri.plane[2] >= 0.3f && tri.plane[2] < 0.7f;
+			tri.is_bounce = faceBounceCandidate
 				|| CM_TerrainTriangleHasBounceEdgeContact(tri, firstTri);
 
 			tri.color[0] = color[0];
