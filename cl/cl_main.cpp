@@ -7,13 +7,9 @@
 
 void CL_Disconnect(int clientNum)
 {
-	if (clientUI->connectionState != CA_DISCONNECTED) { //gets called in the loading screen in 1.7
-		CClipMap::ClearThreadSafe();
-		CGentities::ClearThreadSafe();
-		CStaticEntityFields::m_oGentityFields.clear();
-
-	}
+	CClipMap::ClearThreadSafe();
+	CGentities::ClearThreadSafe();
+	CStaticEntityFields::m_oGentityFields.clear();
 
 	hooktable::find<void, int>(HOOK_PREFIX(__func__))->call(clientNum);
-
 }
