@@ -61,6 +61,7 @@ struct cm_triangle
 	vec4_t color = {};
 	char* material = {};
 	bool has_collision = false;
+	unsigned char bounce_edge_mask = 0;
 	//bool edge_walkable = true;
 
 	inline fvec3 get_mins() const noexcept {
