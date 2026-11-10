@@ -44,15 +44,15 @@ static bool CM_TerrainTriangleHasWalkableEdge(const int triIndex)
 
 static bool CM_TerrainEdgeCanProduceBounceNormal(const fvec3& a, const fvec3& b)
 {
-	const float dx = b.x - a.x;
-	const float dy = b.y - a.y;
-	const float dz = b.z - a.z;
-	const float lengthSq = dx * dx + dy * dy + dz * dz;
+	const float edgeDx = b.x - a.x;
+	const float edgeDy = b.y - a.y;
+	const float edgeDz = b.z - a.z;
+	const float lengthSq = edgeDx * edgeDx + edgeDy * edgeDy + edgeDz * edgeDz;
 
 	if (lengthSq <= 1e-6f)
 		return false;
 
-	const float edgeZ = dz / std::sqrt(lengthSq);
+	const float edgeZ = edgeDz / std::sqrt(lengthSq);
 	const float maxContactNormalZ = std::sqrt(std::max(0.0f, 1.0f - edgeZ * edgeZ));
 
 	return maxContactNormalZ >= 0.3f;
